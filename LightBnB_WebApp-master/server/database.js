@@ -118,10 +118,67 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = (options, limit = 10) => {
+  // hold any parameters thay may be available for the query
+  const queryParams = [];
+
+  // query before WHERE clause
+  let queryString = `
+    SELECT properties.*, avg(property_reviews.rating) as average_rating
+    FROM properties
+    JOIN property_reviews ON properties.id = property_id
+    WHERE
+  `;
+  const addAnd =  () => {if (queryParams.length >= 1) {
+    queryString += ` AND `
+  }};
+
+  // if city has been passed in as an option
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `city LIKE $${queryParams.length}`;
+  }
+
+  // if owner_id has passed in, return properties belonging to that owner
+  if (options.owner_id) {
+    addAnd()
+    queryParams.push(`${options.owner_id}`);
+    queryString += `owner_id = $${queryParams.length}`;
+  }
+
+  if (options.minimum_price_per_night) {
+    addAnd()
+    queryParams.push(`${options.minimum_price_per_night}`);
+    queryString += `cost_per_night > $${queryParams.length}`;
+  }
+
+  if (options.maximum_price_per_night) {
+    addAnd()
+    queryParams.push(`${options.maximum_price_per_night}`);
+    queryString += `cost_per_night < $${queryParams.length}`;
+  }
+
+  queryString += `
+    GROUP BY properties.id
+  `
+
+  if (options.minimum_rating) {
+    queryParams.push(`${options.minimum_rating}`);
+    queryString += `HAVING avg(property_reviews.rating) >= $${queryParams.length}`;
+  }
+
+  // query after HAVING clause
+  queryParams.push(limit);
+  queryString += `
+    ORDER BY cost_per_night
+    LIMIT $${queryParams.length};
+  `
+
+  console.log(queryString, queryParams);
+
   return pool
-    .query(`SELECT * FROM properties LIMIT $1;`, [limit])
-    .then((result) => {
-      return result.rows;
+    .query(queryString, queryParams)
+    .then((res) => {
+      return res.rows;
     })
     .catch((err) => {
       console.log(err);
