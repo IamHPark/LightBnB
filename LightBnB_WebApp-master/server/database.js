@@ -31,7 +31,7 @@ const getUserWithEmail = function(email) {
       if(!users) {
         return null;
       }
-      console.log(users.rows[0])
+      // console.log(users.rows[0])
       return users.rows[0];
     })
     .catch((err) => {
@@ -94,7 +94,18 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  return pool
+    .query(`
+      SELECT properties.*
+      FROM reservations
+      JOIN properties ON property_id = properties.id
+      WHERE guest_id = $1
+      LIMIT $2
+    `, [guest_id, limit])
+    .then((list) => {
+      // console.log(list.rows)
+      return list.rows;
+    })
 }
 exports.getAllReservations = getAllReservations;
 
